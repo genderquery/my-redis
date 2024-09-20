@@ -1,4 +1,5 @@
 use core::str;
+use std::fmt;
 
 use winnow::ascii::dec_int;
 use winnow::combinator::{dispatch, empty, fail, peek, preceded, repeat, terminated, trace};
@@ -12,20 +13,45 @@ const CRLF: &[u8] = b"\r\n";
 
 type Input<'s> = Partial<&'s BStr>;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum Value {
-    // +OK\r\n
     SimpleString(String),
-    // -ERR message\r\n
-    SimpleError(String),
-    // :[<+|->]<value>\r\n
+    ServerError(String),
     Integer(i64),
-    // $<length>\r\n<data>\r\n
     BulkString(Vec<u8>),
-    // *<number-of-elements>\r\n<element-1>...<element-n>
     Array(Vec<Value>),
-    // $-1\r\n or *-1\r\n
     Null,
+}
+
+impl fmt::Debug for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write_value_debug(f, self, 0)
+    }
+}
+
+fn write_value_debug(f: &mut fmt::Formatter<'_>, v: &Value, indent: usize) -> fmt::Result {
+    match v {
+        Value::Null => writeln!(f, "(nil)"),
+        Value::SimpleString(s) => writeln!(f, "\"{s}\""),
+        Value::ServerError(s) => writeln!(f, "(error) {s}"),
+        Value::Integer(i) => writeln!(f, "(integer) {i}"),
+        Value::BulkString(b) => writeln!(f, "\"{}\"", b.escape_ascii()),
+        Value::Array(v) => {
+            if v.is_empty() {
+                writeln!(f, "(empty array)")?;
+            } else {
+                let num_width = (v.len() as f64).log10().floor() as usize + 1;
+                for (i, v) in v.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, "{:>indent$}", "")?;
+                    }
+                    write!(f, "{i:>num_width$}) ", i = i + 1)?;
+                    write_value_debug(f, v, indent + num_width + 2)?
+                }
+            }
+            Ok(())
+        }
+    }
 }
 
 pub fn value(input: &mut Input) -> PResult<Value> {
@@ -61,7 +87,7 @@ fn simple_string(input: &mut Input) -> PResult<Value> {
 fn simple_error(input: &mut Input) -> PResult<Value> {
     trace(
         "simple_error",
-        preceded(b'-', line).map(|s| SimpleError(s.into())),
+        preceded(b'-', line).map(|s| ServerError(s.into())),
     )
     .parse_next(input)
 }
@@ -133,7 +159,7 @@ mod tests {
     #[test]
     fn test_simple_error() {
         let result = value(&mut input_from_bstr(b"-ERR unknown command 'asdf'\r\n"));
-        assert_eq!(result, Ok(SimpleError("ERR unknown command 'asdf'".into())));
+        assert_eq!(result, Ok(ServerError("ERR unknown command 'asdf'".into())));
     }
 
     #[test]

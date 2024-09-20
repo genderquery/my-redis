@@ -1,4 +1,8 @@
+use core::str;
+use std::io;
+
 use clap::{arg, Parser};
+use redis::{connection::Connection, parser::Value};
 use tokio::net::TcpListener;
 
 #[derive(Parser)]
@@ -20,6 +24,17 @@ async fn main() -> redis::Result<()> {
     loop {
         let (socket, _) = listener.accept().await?;
 
-        tokio::spawn(async move {});
+        tokio::spawn(async move {
+            let mut connection = Connection::new(socket);
+            match connection.read().await {
+                Ok(Some(value)) => {
+                    println!("{:?}", value);
+                    connection.write().await?;
+                }
+                Ok(None) => panic!("connection reset by peer"),
+                Err(err) => panic!("{}", err),
+            }
+            anyhow::Ok(())
+        });
     }
 }

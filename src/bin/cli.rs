@@ -1,8 +1,18 @@
-use clap::{arg, Parser};
-use tokio::net::TcpStream;
+use core::str;
 
-#[derive(Parser)]
+use bytes::BytesMut;
+use clap::{arg, ArgAction, Parser};
+use redis::Client;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
+
+#[derive(Parser, Debug)]
+#[command(version, disable_help_flag = true)]
 struct Args {
+    #[arg(long, action = ArgAction::Help)]
+    help: (),
     #[arg(short, long, default_value = "127.0.0.1")]
     host: String,
     #[arg(short, long, default_value = "6379")]
@@ -15,7 +25,7 @@ async fn main() -> redis::Result<()> {
 
     let args = Args::parse();
 
-    let stream = TcpStream::connect((args.host, args.port)).await?;
+    let client = Client::connect((args.host, args.port)).await?;
 
     Ok(())
 }

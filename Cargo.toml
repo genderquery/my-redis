@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bytes = "1.7.1"
+anyhow = "1.0.89"
+bytes = "1.7.2"
 clap = { version = "4.5.17", features = ["derive"] }
 tokio = { version = "1.40.0", features = ["full"] }
 tracing = "0.1.40"
