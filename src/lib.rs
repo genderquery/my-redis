@@ -1,8 +1,9 @@
-pub mod client;
+pub mod codec;
+pub mod command;
 pub mod connection;
 pub mod parser;
-
-pub use client::Client;
+pub mod server;
+pub mod value;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
